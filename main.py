@@ -6,13 +6,15 @@ import os
 from apiclient.discovery import build
 
 # Author: reddyv@
-# Date: 03-04-2016
+# Date: 03-06-2016
 # Usage:
 #   python main.py --help
 # Todo:
-#   1) See if you convert the cv2 image format to base64 directly in memory 
+#   1) Batch multiple images into a single API request to reduce latency. Docs 
+#   say you can batch up to 16 images per request, but it will only respond to
+#   8 images per second
+#   2) See if you convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
-#   2) Can you batch multiple images into a single API request to reduce latency?
 
 def main(video_file, sample_rate, APIKey):
   #obtain service handle for vision API using API Key
@@ -22,7 +24,6 @@ def main(video_file, sample_rate, APIKey):
   
   vidcap = cv2.VideoCapture(video_file)
   position = 0
-  frame = 0
   success,image = vidcap.read()
 
   while success:
@@ -43,10 +44,23 @@ def main(video_file, sample_rate, APIKey):
            }]
         })
       response = service_request.execute()
-      print(response)
+      
+      #response format
+      #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
+      # u'/m/01c4rd', u'description': u'beak'}, {u'score': 0.96588981, u'mid':
+      # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
+      # u'/m/09686', u'description': u'vertebrate'}]}]}
+      
+      #extract labels from response and print
+      labelAnnotations = response['responses'][0]['labelAnnotations']
+      labels = ''
+      for annotation in labelAnnotations:
+        labels += annotation['description']+', '
+      labels = labels[:-2] #trim trailing comma and space
+      
+      print('{} sec:\t{}'.format(position/1000,labels))
   
     #advance to next image
-    frame = frame + 1
     if sample_rate > 0: position = position+1000*sample_rate
     else: position = -1 #terminate
     vidcap.set(0,position)
