@@ -2,7 +2,7 @@
 FROM ubuntu
 
 # File Author / Maintainer
-MAINTAINER Vijay Reddy
+MAINTAINER Vijay Reddy (reddyv@)
 
 # Update the sources list
 RUN apt-get update
@@ -16,11 +16,12 @@ RUN pip install --upgrade google-api-python-client
 # Install Open Computer Vision python module, used for extracting stills from video
 RUN apt-get install -y python-opencv
 
-# This gets rid of the "libdc1394 error: Failed to initialize libdc1394" warning
-RUN ln /dev/null /dev/raw1394
-
 # Download application from git repository
 RUN git clone https://github.com/vijaykyr/coke-vision-api.git /application
 
 # Set the default directory where CMD will execute
 WORKDIR /application
+
+# This gets rid of the "libdc1394 error: Failed to initialize libdc1394" warning
+# Edit: Actually for some reason this command doesn’t take unless you run it from inside the container (after the image is built)
+RUN ln /dev/null /dev/raw1394
