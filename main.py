@@ -10,7 +10,7 @@ from apiclient.discovery import build
 # Usage:
 #   python main.py --help
 # Todo:
-#   1) See if you convert the cv2 image format to base64 directly in memory 
+#   1) See if you can convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
 #   2) Validate JSON responses. Currently you assume they will be succesfull
 
