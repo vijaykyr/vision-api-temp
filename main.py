@@ -58,7 +58,7 @@ def main(video_file, sample_rate, APIKey):
         labels += annotation['description']+', '
       labels = labels[:-2] #trim trailing comma and space
       
-      print('{} sec:\t{}'.format(position/1000,labels))
+      print('{0:8}{1}'.format(str(position/1000)+'sec:',labels))
   
     #advance to next image
     if sample_rate > 0: position = position+1000*sample_rate
