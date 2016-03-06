@@ -15,8 +15,11 @@ from apiclient.discovery import build
 #   8 images per second
 #   2) See if you convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
+#   3) Validate JSON responses instead of assuming they will be succesfull
 
 def main(video_file, sample_rate, APIKey):
+  BATCH_LIMIT = 2 #number of images to send per API request
+  
   #obtain service handle for vision API using API Key
   service = build('vision', 'v1', 
   discoveryServiceUrl='https://vision.googleapis.com/$discovery/rest?version=v1',
@@ -24,47 +27,84 @@ def main(video_file, sample_rate, APIKey):
   
   vidcap = cv2.VideoCapture(video_file)
   position = 0
+  frame = 0
+  batch_count = 0
+  base64_images = []
   success,image = vidcap.read()
-
-  while success:
-    #do stuff with image
-    cv2.imwrite("temp.jpg", image)     # save frame as JPEG file
-    with open("temp.jpg", 'rb') as image:
-      image = base64.b64encode(image.read())  
-      service_request = service.images().annotate(
-        body={
-          'requests': [{
-            'image': {
-              'content': image
-             },
-            'features': [{
-              'type': 'LABEL_DETECTION',
-              'maxResults': 3,
-             }]
-           }]
-        })
-      response = service_request.execute()
+  
+  while success: 
+    
+    #read in frames one batch at a time
+    while success and batch_count < BATCH_LIMIT:
       
+      #convert frame to base64
+      cv2.imwrite('temp.jpg', image) 
+      with open('temp.jpg','rb') as image:
+        base64_images.append((position/1000,base64.b64encode(image.read())))
+    
+      #advance to next image
+      if sample_rate > 0: position = position+1000*sample_rate
+      else: position = -1 #terminate
+      frame += 1
+      batch_count += 1
+      vidcap.set(0,position)
+      success,image = vidcap.read()
+  
+  
+    #send batch to vision API
+    while base64_images: #while there are images in the list
+      
+      service_request = service.images().annotate(body=
+      {
+        'requests': [
+        {
+          'image': {
+            'content': base64_images[0][1]
+           },
+          'features': [{
+            'type': 'LABEL_DETECTION',
+            'maxResults': 3,
+           }] 
+        },
+        {
+           'image': {
+             'content': base64_images[1][1]
+            },
+           'features': [{
+             'type': 'LABEL_DETECTION',
+             'maxResults': 3,
+            }]
+         }]
+      })
+      response = service_request.execute()
+  
       #response format
       #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
       # u'/m/01c4rd', u'description': u'beak'}, {u'score': 0.96588981, u'mid':
       # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
       # u'/m/09686', u'description': u'vertebrate'}]}]}
-      
+  
       #extract labels from response and print
       labelAnnotations = response['responses'][0]['labelAnnotations']
       labels = ''
       for annotation in labelAnnotations:
         labels += annotation['description']+', '
       labels = labels[:-2] #trim trailing comma and space
-      
-      print('{0:8}{1}'.format(str(position/1000)+'sec:',labels))
   
-    #advance to next image
-    if sample_rate > 0: position = position+1000*sample_rate
-    else: position = -1 #terminate
-    vidcap.set(0,position)
-    success,image = vidcap.read()
+      print('{0:8}{1}'.format(str(base64_images[0][0])+'sec:',labels))
+      
+      labelAnnotations = response['responses'][1]['labelAnnotations']
+      labels = ''
+      for annotation in labelAnnotations:
+        labels += annotation['description']+', '
+      labels = labels[:-2] #trim trailing comma and space
+  
+      print('{0:8}{1}'.format(str(base64_images[1][0])+'sec:',labels))
+      #reset for next batch
+      
+      batch_count = 0
+      base64_images = []
+  
   
   #cleanup
   os.remove("temp.jpg")
