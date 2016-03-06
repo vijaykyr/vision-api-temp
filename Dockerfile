@@ -17,7 +17,7 @@ RUN pip install --upgrade google-api-python-client
 RUN apt-get install -y python-opencv
 
 # Download application from git repository
-RUN echo "cache-bust" && git clone https://github.com/vijaykyr/coke-vision-api.git /application 
+RUN git clone https://github.com/vijaykyr/coke-vision-api.git /application 
 
 # Set the default directory where CMD will execute
 WORKDIR /application
