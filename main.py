@@ -7,14 +7,8 @@ from apiclient.discovery import build
 
 # Author: reddyv@
 # Date: 03-04-2016
-# Description:
-#   1) reads in a video from the command line
-#   2) extracts one still frame per second from it
-#   3) passes each image still to the vision API and prints the response 
 # Usage:
-#   from the command line pass positional arguments:
-#      video_file  file path of the video you'd like to process.
-#      APIKey      The API Key that identifies your Google Cloud Console Project
+#   python main.py --help
 # Todo:
 #   1) See if you convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
@@ -44,7 +38,7 @@ def main(video_file, sample_rate, APIKey):
              },
             'features': [{
               'type': 'LABEL_DETECTION',
-              'maxResults': 1,
+              'maxResults': 3,
              }]
            }]
         })
@@ -53,7 +47,8 @@ def main(video_file, sample_rate, APIKey):
   
     #advance to next image
     frame = frame + 1
-    position = position+1000*sample_rate
+    if sample_rate > 0: position = position+1000*sample_rate
+    else: position = -1 #terminate
     vidcap.set(0,position)
     success,image = vidcap.read()
   
@@ -69,8 +64,8 @@ if __name__ == '__main__':
     'APIKey', help=('The API Key that identifies your Google Cloud Console '
     'Project with Vision API Enabled'))
   parser.add_argument(
-    '-s','--sample-rate',dest='samplerate', default=5, choices=range(1,61),
-    type=int, help=('The rate at which stills should be sampled from the '
+    '-s','--sample-rate',dest='samplerate', default=5, type=int, 
+    help=('The rate at which stills should be sampled from the '
     'video. Default is 5 (one frame per 5 seconds).'))
   args = parser.parse_args()
   main(args.video_file,args.samplerate,args.APIKey)
