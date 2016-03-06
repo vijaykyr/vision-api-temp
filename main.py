@@ -10,15 +10,13 @@ from apiclient.discovery import build
 # Usage:
 #   python main.py --help
 # Todo:
-#   1) Batch multiple images into a single API request to reduce latency. Docs 
-#   say you can batch up to 16 images per request, but it will only respond to
-#   8 images per second
-#   2) See if you convert the cv2 image format to base64 directly in memory 
+#   1) See if you convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
-#   3) Validate JSON responses instead of assuming they will be succesfull
+#   2) Validate JSON responses. Currently you assume they will be succesfull
 
 def main(video_file, sample_rate, APIKey):
-  BATCH_LIMIT = 2 #number of images to send per API request
+  BATCH_LIMIT = 8 #number of images to send per API request, documented limits
+  # are 16 images per quest, and 8 images per second
   
   #obtain service handle for vision API using API Key
   service = build('vision', 'v1', 
@@ -29,7 +27,7 @@ def main(video_file, sample_rate, APIKey):
   position = 0
   frame = 0
   batch_count = 0
-  base64_images = []
+  base64_images = [] 
   success,image = vidcap.read()
   
   while success: 
@@ -52,64 +50,51 @@ def main(video_file, sample_rate, APIKey):
   
   
     #send batch to vision API
-    while base64_images: #while there are images in the list
-      
-      service_request = service.images().annotate(body=
-      {
-        'requests': [
+    json_request = {'requests': []}
+    for img in base64_images:
+      json_request['requests'].append(
         {
           'image': {
-            'content': base64_images[0][1]
+            'content': img[1] #img is a tuple (timestamp, base64image)
            },
           'features': [{
             'type': 'LABEL_DETECTION',
             'maxResults': 3,
            }] 
-        },
-        {
-           'image': {
-             'content': base64_images[1][1]
-            },
-           'features': [{
-             'type': 'LABEL_DETECTION',
-             'maxResults': 3,
-            }]
-         }]
-      })
-      response = service_request.execute()
-  
-      #response format
-      #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
-      # u'/m/01c4rd', u'description': u'beak'}, {u'score': 0.96588981, u'mid':
-      # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
-      # u'/m/09686', u'description': u'vertebrate'}]}]}
-  
-      #extract labels from response and print
-      labelAnnotations = response['responses'][0]['labelAnnotations']
+        })
+      
+    service_request = service.images().annotate(body=json_request)
+    responses = service_request.execute()
+
+    #response format
+    #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
+    # u'/m/01c4rd', u'description': u'beak'}, {u'score': 0.96588981, u'mid':
+    # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
+    # u'/m/09686', u'description': u'vertebrate'}]}]}
+
+    #process response and print output results
+    for response, img in zip(responses['responses'],base64_images):
       labels = ''
-      for annotation in labelAnnotations:
+      for annotation in response['labelAnnotations']:
         labels += annotation['description']+', '
       labels = labels[:-2] #trim trailing comma and space
-  
-      print('{0:8}{1}'.format(str(base64_images[0][0])+'sec:',labels))
       
-      labelAnnotations = response['responses'][1]['labelAnnotations']
-      labels = ''
-      for annotation in labelAnnotations:
-        labels += annotation['description']+', '
-      labels = labels[:-2] #trim trailing comma and space
-  
-      print('{0:8}{1}'.format(str(base64_images[1][0])+'sec:',labels))
-      #reset for next batch
-      
-      batch_count = 0
-      base64_images = []
-  
+      # ASSUMPTION: this assumes the API returns responses in the order they
+      # were received. Otherwise the timestamps may not be paired with the 
+      # correct lables
+      print('{0:8}{1}'.format(str(img[0])+'sec:',labels))
+    
+    #reset for next batch
+    batch_count = 0
+    base64_images = []
+
   
   #cleanup
   os.remove("temp.jpg")
   
 if __name__ == '__main__':
+  
+  #configure command line options
   parser = argparse.ArgumentParser(
     description='Feed a video to the Google Vision API')
   parser.add_argument(
@@ -121,5 +106,9 @@ if __name__ == '__main__':
     '-s','--sample-rate',dest='samplerate', default=5, type=int, 
     help=('The rate at which stills should be sampled from the '
     'video. Default is 5 (one frame per 5 seconds).'))
+  
+  #read in command line arguments
   args = parser.parse_args()
+  
+  #start execution
   main(args.video_file,args.samplerate,args.APIKey)
