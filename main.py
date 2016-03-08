@@ -12,7 +12,7 @@ from apiclient.discovery import build
 # Todo:
 #   1) See if you can convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
-#   2) Validate JSON responses. Currently you assume they will be succesfull
+#   2) Validate JSON responses. Currently you assume API request will be succesfull
 
 def main(video_file, sample_rate, APIKey):
   BATCH_LIMIT = 8 #number of images to send per API request, documented limits
@@ -23,6 +23,7 @@ def main(video_file, sample_rate, APIKey):
   discoveryServiceUrl='https://vision.googleapis.com/$discovery/rest?version=v1',
   developerKey=APIKey)
   
+  #initialize vars and grab initial frame
   vidcap = cv2.VideoCapture(video_file)
   position = 0
   frame = 0
@@ -72,7 +73,7 @@ def main(video_file, sample_rate, APIKey):
     # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
     # u'/m/09686', u'description': u'vertebrate'}]}]}
 
-    #process response and print output results
+    #process response and print results
     for response, img in zip(responses['responses'],base64_images):
       labels = ''
       for annotation in response['labelAnnotations']:
