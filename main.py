@@ -4,6 +4,7 @@ import cv2
 import os
 
 from apiclient.discovery import build
+from oauth2client.client import GoogleCredentials
 
 # Author: reddyv@
 # Last Update: 03-11-2016
@@ -14,22 +15,50 @@ from apiclient.discovery import build
 #   without having to write to disk first
 #   2) Validate JSON responses. Currently you assume API request will be succesfull
 #   3) Evaluate using a lighterweight framegrabber than OpenCV.
+#   4) Figure out why application default credentials don't work for vision API
 
-def main(video_file, sample_rate, APIKey):
+def main(file_name, sample_rate, APIKey):
   BATCH_LIMIT = 8 #number of images to send per API request, documented limits
   # are 16 images per quest, and 8 images per second
   
   #obtain service handle for vision API using API Key
+  #Note: would prefer to use application default credentials rather than API key
+  # but get the following error when i try. Appears to be trying to authenticate
+  # to a different project than the one specified during gcloud init
+  """googleapiclient.errors.HttpError: <HttpError 403 when requesting
+   https://vision.googleapis.com/v1/images:annotate?alt=json returned "Project 
+   has not activated the vision.googleapis.com API. Please enable the API for 
+   project google.com:cloudsdktool (#32555940559).">"""
+   
   service = build('vision', 'v1', 
   discoveryServiceUrl='https://vision.googleapis.com/$discovery/rest?version=v1',
   developerKey=APIKey)
   
-  #initialize vars and grab initial frame
-  vidcap = cv2.VideoCapture(video_file)
+  #initialize vars 
   position = 0
   frame = 0
   batch_count = 0
   base64_images = [] 
+  
+  if file_name.startswith('gs://'): #download file from gcs
+    #get application default credentials (specified during gcloud init)
+    credentials = GoogleCredentials.get_application_default()
+
+    #construct service handle
+    gcs_service = build('storage', 'v1', credentials=credentials)
+
+    #'get_media' returns file contents while 'get' returns file metadata
+    req = gcs_service.objects().get_media(bucket='vijays-test-bucket', 
+      object='final-result.mp4')
+
+    #execute request and save response to disk
+    with open('temp.mp4','w') as file:
+      file.write(req.execute())
+      file_name = 'temp.mp4'
+    
+  #grab first frame
+  #format note: this has been tested with the mp4 video format ONLY     
+  vidcap = cv2.VideoCapture(file_name)
   success,image = vidcap.read()
   
   while success: 
@@ -76,8 +105,8 @@ def main(video_file, sample_rate, APIKey):
 
     #process response and print results
     for response, img in zip(responses['responses'],base64_images):
-      labels = ''
       if(response):
+        labels = ''
         for annotation in response['labelAnnotations']:
           labels += annotation['description']+', '
         labels = labels[:-2] #trim trailing comma and space
@@ -94,7 +123,9 @@ def main(video_file, sample_rate, APIKey):
 
   
   #cleanup
-  os.remove("temp.jpg")
+  os.remove('temp.jpg')
+  if os.path.isfile('temp.mp4'): os.remove('temp.mp4')
+  
   
 if __name__ == '__main__':
   
@@ -102,7 +133,9 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(
     description='Feed a video to the Google Vision API')
   parser.add_argument(
-    'video_file', help='The video you\'d like to process.')
+    'file_name', help=('The video you\'d like to process. Can either pass a '
+    'local file or a GCS file in the format "gs://<bucket-name>/<file'
+    '-path>"'))
   parser.add_argument(
     'APIKey', help=('The API Key that identifies your Google Cloud Console '
     'Project with Vision API Enabled'))
@@ -115,4 +148,4 @@ if __name__ == '__main__':
   args = parser.parse_args()
   
   #start execution
-  main(args.video_file,args.samplerate,args.APIKey)
+  main(args.file_name,args.samplerate,args.APIKey)
