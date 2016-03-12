@@ -13,6 +13,7 @@ from apiclient.discovery import build
 #   1) See if you can convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first
 #   2) Validate JSON responses. Currently you assume API request will be succesfull
+#   3) Evaluate using a lighterweight framegrabber than OpenCV.
 
 def main(video_file, sample_rate, APIKey):
   BATCH_LIMIT = 8 #number of images to send per API request, documented limits
