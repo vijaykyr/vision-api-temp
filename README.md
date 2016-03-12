@@ -1,4 +1,4 @@
-# coke-vision-api
+# vision-api-video
 A containerized python app that:
 
   1. reads in a video file and Google API Key from the command line
