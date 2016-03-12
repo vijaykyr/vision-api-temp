@@ -6,7 +6,7 @@ import os
 from apiclient.discovery import build
 
 # Author: reddyv@
-# Date: 03-06-2016
+# Last Update: 03-11-2016
 # Usage:
 #   python main.py --help
 # Todo:
@@ -77,14 +77,16 @@ def main(video_file, sample_rate, APIKey):
     #process response and print results
     for response, img in zip(responses['responses'],base64_images):
       labels = ''
-      for annotation in response['labelAnnotations']:
-        labels += annotation['description']+', '
-      labels = labels[:-2] #trim trailing comma and space
+      if(response):
+        for annotation in response['labelAnnotations']:
+          labels += annotation['description']+', '
+        labels = labels[:-2] #trim trailing comma and space
       
-      # ASSUMPTION: this assumes the API returns responses in the order they
-      # were received. Otherwise the timestamps may not be paired with the 
-      # correct lables
-      print('{0:8}{1}'.format(str(img[0])+'sec:',labels))
+        # ASSUMPTION: this assumes the API returns responses in the order they
+        # were received. Otherwise the timestamps may not be paired with the 
+        # correct lables
+        print('{0:8}{1}'.format(str(img[0])+'sec:',labels))
+      else: print('{0:8}n/a'.format(str(img[0])+'sec:'))
     
     #reset for next batch
     batch_count = 0
