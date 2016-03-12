@@ -2,6 +2,7 @@ import argparse
 import base64
 import cv2
 import os
+import re
 
 from apiclient.discovery import build
 from oauth2client.client import GoogleCredentials
@@ -40,16 +41,19 @@ def main(file_name, sample_rate, APIKey):
   batch_count = 0
   base64_images = [] 
   
-  if file_name.startswith('gs://'): #download file from gcs
+  if file_name.lower().startswith('gs://'): #download file from gcs
     #get application default credentials (specified during gcloud init)
     credentials = GoogleCredentials.get_application_default()
 
     #construct service handle
     gcs_service = build('storage', 'v1', credentials=credentials)
 
+    #extract GCS bucket and object from file name
+    re_match = re.match(r'gs://(.*?)/(.*)', file_name, re.I)
+    
     #'get_media' returns file contents while 'get' returns file metadata
-    req = gcs_service.objects().get_media(bucket='vijays-test-bucket', 
-      object='final-result.mp4')
+    req = gcs_service.objects().get_media(bucket=re_match.group(1), 
+      object=re_match.group(2))
 
     #execute request and save response to disk
     with open('temp.mp4','w') as file:
