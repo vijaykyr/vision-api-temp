@@ -6,6 +6,7 @@ import re
 
 from apiclient.discovery import build
 from oauth2client.client import GoogleCredentials
+from timer import Timer
 
 # Author: reddyv@
 # Last Update: 03-11-2016
@@ -19,7 +20,7 @@ from oauth2client.client import GoogleCredentials
 #   4) Figure out why application default credentials don't work for vision API
 
 def main(file_name, sample_rate, APIKey):
-  BATCH_LIMIT = 8 #number of images to send per API request, documented limits
+  BATCH_LIMIT = 16 #number of images to send per API request, documented limits
   # are 16 images per quest, and 8 images per second
   
   #obtain service handle for vision API using API Key
@@ -65,65 +66,67 @@ def main(file_name, sample_rate, APIKey):
   vidcap = cv2.VideoCapture(file_name)
   success,image = vidcap.read()
   
+  
   while success: 
     
+    with Timer('Batch Total') as t:
     #read in frames one batch at a time
-    while success and batch_count < BATCH_LIMIT:
+      while success and batch_count < BATCH_LIMIT:
       
-      #convert frame to base64
-      cv2.imwrite('temp.jpg', image) 
-      with open('temp.jpg','rb') as image:
-        base64_images.append((position/1000,base64.b64encode(image.read())))
+        #convert frame to base64
+        cv2.imwrite('temp.jpg', image) 
+        with open('temp.jpg','rb') as image:
+          base64_images.append((position/1000,base64.b64encode(image.read())))
     
-      #advance to next image
-      if sample_rate > 0: position = position+1000*sample_rate
-      else: position = -1 #terminate
-      frame += 1
-      batch_count += 1
-      vidcap.set(0,position)
-      success,image = vidcap.read()
+        #advance to next image
+        if sample_rate > 0: position = position+1000*sample_rate
+        else: position = -1 #terminate
+        frame += 1
+        batch_count += 1
+        vidcap.set(0,position)
+        success,image = vidcap.read()
   
   
-    #send batch to vision API
-    json_request = {'requests': []}
-    for img in base64_images:
-      json_request['requests'].append(
-        {
-          'image': {
-            'content': img[1] #img is a tuple (timestamp, base64image)
-           },
-          'features': [{
-            'type': 'LABEL_DETECTION',
-            'maxResults': 3,
-           }] 
-        })
+      #send batch to vision API
+      json_request = {'requests': []}
+      for img in base64_images:
+        json_request['requests'].append(
+          {
+            'image': {
+              'content': img[1] #img is a tuple (timestamp, base64image)
+             },
+            'features': [{
+              'type': 'LABEL_DETECTION',
+              'maxResults': 3,
+             }] 
+          })
       
-    service_request = service.images().annotate(body=json_request)
-    responses = service_request.execute()
+      service_request = service.images().annotate(body=json_request)
+      with Timer('API request') as t: responses = service_request.execute()
 
-    #response format
-    #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
-    # u'/m/01c4rd', u'description': u'beak'}, {u'score': 0.96588981, u'mid':
-    # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
-    # u'/m/09686', u'description': u'vertebrate'}]}]}
+      #response format
+      #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
+      # u'/m/01c4rd', u'description': u'beak'}, {u'score': 0.96588981, u'mid':
+      # u'/m/015p6', u'description': u'bird'}, {u'score': 0.85704041, u'mid':
+      # u'/m/09686', u'description': u'vertebrate'}]}]}
 
-    #process response and print results
-    for response, img in zip(responses['responses'],base64_images):
-      if(response):
-        labels = ''
-        for annotation in response['labelAnnotations']:
-          labels += annotation['description']+', '
-        labels = labels[:-2] #trim trailing comma and space
+      #process response and print results
+      for response, img in zip(responses['responses'],base64_images):
+        if(response):
+          labels = ''
+          for annotation in response['labelAnnotations']:
+            labels += annotation['description']+', '
+          labels = labels[:-2] #trim trailing comma and space
       
-        # ASSUMPTION: this assumes the API returns responses in the order they
-        # were received. Otherwise the timestamps may not be paired with the 
-        # correct lables
-        print('{0:8}{1}'.format(str(img[0])+'sec:',labels))
-      else: print('{0:8}n/a'.format(str(img[0])+'sec:'))
+          # ASSUMPTION: this assumes the API returns responses in the order they
+          # were received. Otherwise the timestamps may not be paired with the 
+          # correct lables
+          print('{0:8}{1}'.format(str(img[0])+'sec:',labels))
+        else: print('{0:8}n/a'.format(str(img[0])+'sec:'))
     
-    #reset for next batch
-    batch_count = 0
-    base64_images = []
+      #reset for next batch
+      batch_count = 0
+      base64_images = []
 
   
   #cleanup
@@ -152,4 +155,4 @@ if __name__ == '__main__':
   args = parser.parse_args()
   
   #start execution
-  main(args.file_name,args.samplerate,args.APIKey)
+  with Timer('Total') as t: main(args.file_name,args.samplerate,args.APIKey)
