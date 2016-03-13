@@ -20,8 +20,8 @@ from timer import Timer
 #   4) Figure out why application default credentials don't work for vision API
 
 def main(file_name, sample_rate, APIKey):
-  BATCH_LIMIT = 16 #number of images to send per API request, documented limits
-  # are 16 images per quest, and 8 images per second
+  BATCH_LIMIT = 16 #number of images to send per API request. Documented limit
+  # is 16 images per request but i've tested up to 150 per request with success
   
   #obtain service handle for vision API using API Key
   #Note: would prefer to use application default credentials rather than API key
@@ -70,22 +70,26 @@ def main(file_name, sample_rate, APIKey):
   while success: 
     
     with Timer('Batch Total') as t:
-    #read in frames one batch at a time
+      
+      #read in frames one batch at a time
       while success and batch_count < BATCH_LIMIT:
       
         #convert frame to base64
         cv2.imwrite('temp.jpg', image) 
         with open('temp.jpg','rb') as image:
           base64_images.append((position/1000,base64.b64encode(image.read())))
-    
+      
+        
         #advance to next image
         if sample_rate > 0: position = position+1000*sample_rate
         else: position = -1 #terminate
         frame += 1
         batch_count += 1
         vidcap.set(0,position)
-        success,image = vidcap.read()
-  
+        
+        #vicap.read() takes ~200ms per frame on macbook air 
+        #this is the performance bottleneck
+        with Timer('Read frame') as t: success,image = vidcap.read()
   
       #send batch to vision API
       json_request = {'requests': []}
@@ -102,6 +106,12 @@ def main(file_name, sample_rate, APIKey):
           })
       
       service_request = service.images().annotate(body=json_request)
+      
+      #API performance
+      # tl;dr: the more you batch, the faster it is
+      #  1 frame takes ~1 sec
+      #  10 frames takes ~1.5 sec
+      #  100 frames takes ~4.0 sec
       with Timer('API request') as t: responses = service_request.execute()
 
       #response format
