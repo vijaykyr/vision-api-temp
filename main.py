@@ -71,7 +71,7 @@ def main(file_name, sample_rate, APIKey):
   
   while success: 
     
-    with Timer('Batch Total') as t:
+    with Timer('Batch Total'):
       
       #read in frames one batch at a time
       while success and batch_count < BATCH_LIMIT:
@@ -91,7 +91,7 @@ def main(file_name, sample_rate, APIKey):
         
         #vicap.read() takes ~200ms per frame on macbook air 
         #this is the performance bottleneck
-        with Timer('Read frame') as t: success,image = vidcap.read()
+        with Timer('Read frame'): success,image = vidcap.read()
   
       #send batch to vision API
       json_request = {'requests': []}
@@ -127,7 +127,7 @@ def main(file_name, sample_rate, APIKey):
       #  1 frame batch takes ~1 sec
       #  10 frame batch takes ~1.5 sec
       #  100 frame batch takes ~4.0 sec
-      with Timer('API request') as t: responses = service_request.execute()
+      with Timer('API request'): responses = service_request.execute()
 
       #response format
       #{u'responses': [{u'labelAnnotations': [{u'score': 0.99651724, u'mid':
@@ -142,14 +142,6 @@ def main(file_name, sample_rate, APIKey):
           #print frame timestamp
           print(str(img[0])+'sec')
           
-          #process safe search
-          print '\tSafe Search:',
-          if response.has_key('safeSearchAnnotation'):
-            print('Adult Content-{0}, Violent Content-{1}'.format(
-            response.get('safeSearchAnnotation').get('adult'),
-            response.get('safeSearchAnnotation').get('violence'))) 
-          else: print('{0:8}no safe search results'.format(str(img[0])+'sec:'))
-          
           #process labels
           print '\tLabels:',
           if response.has_key('labelAnnotations'):
@@ -162,11 +154,21 @@ def main(file_name, sample_rate, APIKey):
             printEntityAnnotation(response.get('logoAnnotations'))
           else: print('no logos identified')
           
+          #process safe search
+          print '\tSafe Search:'
+          if response.has_key('safeSearchAnnotation'):
+            print('\t  Adult Content is '+
+              response.get('safeSearchAnnotation').get('adult'))
+            print('\t  Violent Content is '+
+              response.get('safeSearchAnnotation').get('violence'))
+          else: print('\t\tno safe search results')
+          
           #process text (OCR-optical character recognition)
           print '\tText:',
           if response.has_key('textAnnotations'):
             printEntityAnnotation(response.get('textAnnotations'))
           else: print('no text identified') 
+          
       else: print('no response')
       
       #reset for next batch
@@ -211,4 +213,4 @@ if __name__ == '__main__':
   args = parser.parse_args()
   
   #start execution
-  with Timer('Total') as t: main(args.file_name,args.samplerate,args.APIKey)
+  with Timer('Total'): main(args.file_name,args.samplerate,args.APIKey)

@@ -1,5 +1,7 @@
 import time
 
+#To enable performance timing set self.verbose = True
+
 class Timer(object):
     def __init__(self, message):
         self.message = message
