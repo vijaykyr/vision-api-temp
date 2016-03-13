@@ -14,9 +14,12 @@ from timer import Timer
 #   python main.py --help
 # Todo:
 #   1) See if you can convert the cv2 image format to base64 directly in memory 
-#   without having to write to disk first
+#   without having to write to disk first. Note this is more of an academic
+#   excercise because the disk read/write time is still an order of magnitude
+#   less than the frame grabbing time (10ms vs 200ms)
 #   2) Validate JSON responses. Currently you assume API request will be succesfull
-#   3) Evaluate using a lighterweight framegrabber than OpenCV.
+#   3) Evaluate using a faster framegrabber than OpenCV. Can you get
+#   faster than 200ms/frame? This is the current performance bottleneck
 #   4) Figure out why application default credentials don't work for vision API
 
 def main(file_name, sample_rate, APIKey):
