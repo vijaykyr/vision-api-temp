@@ -9,18 +9,17 @@ from oauth2client.client import GoogleCredentials
 from timer import Timer
 
 # Author: reddyv@
-# Last Update: 03-11-2016
+# Last Update: 03-13-2016
 # Usage:
 #   python main.py --help
 # Todo:
-#   1) See if you can convert the cv2 image format to base64 directly in memory 
+#   1) Evaluate using a faster framegrabber than OpenCV. Can you get
+#   faster than 200ms/frame? This is the current performance bottleneck
+#   2) Figure out why application default credentials don't work for vision API
+#   3) See if you can convert the cv2 image format to base64 directly in memory 
 #   without having to write to disk first. Note this is more of an academic
 #   excercise because the disk read/write time is still an order of magnitude
 #   less than the frame grabbing time (10ms vs 200ms)
-#   2) Validate JSON responses. Currently you assume API request will be succesfull
-#   3) Evaluate using a faster framegrabber than OpenCV. Can you get
-#   faster than 200ms/frame? This is the current performance bottleneck
-#   4) Figure out why application default credentials don't work for vision API
 
 def main(file_name, sample_rate, APIKey):
   BATCH_LIMIT = 16 #number of images to send per API request. Documented limit
@@ -100,21 +99,34 @@ def main(file_name, sample_rate, APIKey):
         json_request['requests'].append(
           {
             'image': {
-              'content': img[1] #img is a tuple (timestamp, base64image)
+              'content': img[1] #recall img is a tuple (timestamp, base64image)
              },
-            'features': [{
+            'features': [
+             {
+              'type': 'SAFE_SEARCH_DETECTION',
+             },
+             {
               'type': 'LABEL_DETECTION',
               'maxResults': 3,
-             }] 
+             },
+             {
+              'type': 'LOGO_DETECTION',
+              'maxResults': 3,
+             },
+             {
+              'type': 'TEXT_DETECTION',
+              'maxResults': 3,
+             }
+             ] 
           })
       
       service_request = service.images().annotate(body=json_request)
       
       #API performance
-      # tl;dr: the more you batch, the faster it is
-      #  1 frame takes ~1 sec
-      #  10 frames takes ~1.5 sec
-      #  100 frames takes ~4.0 sec
+      # tl;dr: the more you batch the better
+      #  1 frame batch takes ~1 sec
+      #  10 frame batch takes ~1.5 sec
+      #  100 frame batch takes ~4.0 sec
       with Timer('API request') as t: responses = service_request.execute()
 
       #response format
@@ -124,19 +136,39 @@ def main(file_name, sample_rate, APIKey):
       # u'/m/09686', u'description': u'vertebrate'}]}]}
 
       #process response and print results
-      for response, img in zip(responses['responses'],base64_images):
-        if(response):
-          labels = ''
-          for annotation in response['labelAnnotations']:
-            labels += annotation['description']+', '
-          labels = labels[:-2] #trim trailing comma and space
+      if responses.has_key('responses'):
+        for response, img in zip(responses.get('responses'),base64_images):
+         
+          #print frame timestamp
+          print(str(img[0])+'sec')
+          
+          #process safe search
+          print '\tSafe Search:',
+          if response.has_key('safeSearchAnnotation'):
+            print('Adult Content-{0}, Violent Content-{1}'.format(
+            response.get('safeSearchAnnotation').get('adult'),
+            response.get('safeSearchAnnotation').get('violence'))) 
+          else: print('{0:8}no safe search results'.format(str(img[0])+'sec:'))
+          
+          #process labels
+          print '\tLabels:',
+          if response.has_key('labelAnnotations'):
+            printEntityAnnotation(response.get('labelAnnotations'))
+          else: print('no labels identified')
+          
+          #process logos
+          print '\tLogos:',
+          if response.has_key('logoAnnotations'):
+            printEntityAnnotation(response.get('logoAnnotations'))
+          else: print('no logos identified')
+          
+          #process text (OCR-optical character recognition)
+          print '\tText:',
+          if response.has_key('textAnnotations'):
+            printEntityAnnotation(response.get('textAnnotations'))
+          else: print('no text identified') 
+      else: print('no response')
       
-          # ASSUMPTION: this assumes the API returns responses in the order they
-          # were received. Otherwise the timestamps may not be paired with the 
-          # correct lables
-          print('{0:8}{1}'.format(str(img[0])+'sec:',labels))
-        else: print('{0:8}n/a'.format(str(img[0])+'sec:'))
-    
       #reset for next batch
       batch_count = 0
       base64_images = []
@@ -145,7 +177,18 @@ def main(file_name, sample_rate, APIKey):
   #cleanup
   os.remove('temp.jpg')
   if os.path.isfile('temp.mp4'): os.remove('temp.mp4')
+
+def printEntityAnnotation(annotations):
+  entities = ''
+  for annotation in annotations:
+    entities += annotation['description']+', '
+  entities = entities[:-2] #trim trailing comma and space
   
+  #added this try/except because API was returning non-unicode text for OCR
+  try:
+    print(entities)
+  except UnicodeEncodeError as err:
+    print(err)
   
 if __name__ == '__main__':
   
