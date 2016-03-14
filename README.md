@@ -5,4 +5,5 @@ A containerized python app that:
   2. samples still frames from the video 
   3. passes the image stills in batches to the Google Vision API and prints the response 
 	
-Usage: python main.py --help	
+Usage: 
+`python main.py --help`	
