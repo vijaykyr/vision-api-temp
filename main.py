@@ -13,13 +13,13 @@ from timer import Timer
 # Usage:
 #   python main.py --help
 # Todo:
-#   1) Evaluate using a faster framegrabber than OpenCV. Can you get
-#   faster than 200ms/frame? This is the current performance bottleneck
+#   1) Evaluate using ffmpeg instead of OpenCV. Can you get faster than 
+#   200ms/frame? This is the current performance bottleneck
 #   2) Figure out why application default credentials don't work for vision API
 #   3) See if you can convert the cv2 image format to base64 directly in memory 
-#   without having to write to disk first. Note this is more of an academic
-#   excercise because the disk read/write time is still an order of magnitude
-#   less than the frame grabbing time (10ms vs 200ms)
+#   without having to write to disk first. Note this is lower priority because
+#   the disk read/write time is still an order of magnitude less than the frame
+#   grabbing time (10ms vs 200ms), at least on SSD storage
 
 def main(file_name, sample_rate, APIKey):
   BATCH_LIMIT = 16 #number of images to send per API request. Documented limit
@@ -127,6 +127,8 @@ def main(file_name, sample_rate, APIKey):
       #  1 frame batch takes ~1 sec
       #  10 frame batch takes ~1.5 sec
       #  100 frame batch takes ~4.0 sec
+      # Note these numbers should drop a bit when running the app from the cloud
+      # due to reduced latency. But relative differences should hold.
       with Timer('API request'): responses = service_request.execute()
 
       #response format
